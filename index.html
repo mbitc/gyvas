@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GYVAS — P2P Intelekto Mazgas & CID</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #090a0f;
+            color: #e2e8f0;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        .font-sync { font-family: 'Syncopate', sans-serif; }
+
+        .grid-overlay {
+            background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0);
+            background-size: 32px 32px;
+        }
+
+        .glass-panel {
+            background: rgba(12, 15, 24, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.2s ease;
+        }
+
+        .glass-button:active {
+            transform: scale(0.97);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .glass-input {
+            background: rgba(5, 7, 12, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #d4d4d4;
+            outline: none;
+        }
+        .glass-input:focus {
+            border-color: #10b981;
+        }
+
+        .cid-box {
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #34d399;
+            background: rgba(52, 211, 153, 0.05);
+            border: 1px dashed rgba(52, 211, 153, 0.3);
+            word-break: break-all;
+        }
+
+        /* Sklandus stalčiaus slinkimas */
+        .drawer {
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .drawer-closed {
+            transform: translateY(100%);
+        }
+        .drawer-open {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen flex flex-col justify-between items-center p-4 md:p-8 select-none">
+
+    <!-- Canvas Background layer -->
+    <canvas id="nodeCanvas" class="absolute inset-0 w-full h-full z-0 cursor-pointer"></canvas>
+    <div class="absolute inset-0 grid-overlay pointer-events-none z-0 opacity-40"></div>
+
+    <!-- VIRŠUTINĖ JUOSTA -->
+    <header class="relative z-10 w-full max-w-4xl flex justify-between items-center glass-panel px-4 py-3 rounded-2xl">
+        <div class="flex items-center space-x-3">
+            <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></div>
+            <span id="p2pProtocol" class="text-[11px] uppercase tracking-widest text-slate-300 font-mono">NOSTR // MESH TINKLAS</span>
+        </div>
+
+        <div class="flex items-center space-x-4 text-xs font-mono text-slate-400">
+            <span class="hidden sm:inline">MAZGAS: <strong id="nodeIdDisplay" class="text-cyan-400">#0x--</strong></span>
+            <button onclick="toggleDrawer()" class="glass-button px-3 py-1.5 rounded-xl text-cyan-300 flex items-center space-x-1.5">
+                <span>PARAMETRAI</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- CENTRINIS EKRANO TURINYS -->
+    <main class="relative z-10 my-auto text-center flex flex-col items-center justify-center max-w-xl px-4 pointer-events-none">
+        
+        <div id="statusBadge" class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full glass-panel text-amber-400 text-xs tracking-widest uppercase font-mono mb-6 transition-all duration-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            <span id="badgeText">Laukia Kaimyninio Mazgo</span>
+        </div>
+
+        <h1 id="mainTitle" class="text-4xl sm:text-6xl font-bold font-sync uppercase tracking-tighter text-slate-100 transition-all duration-700 leading-tight text-glow-dormant">
+            TINKLAS MIEGA
+        </h1>
+
+        <p id="mainDesc" class="mt-4 text-xs sm:text-sm text-slate-400 max-w-md font-light leading-relaxed">
+            Vienas mazgas kuria tik aidą. Prisijunk arba simuliuok antrą tašką, kad sukurtum gyvą rezonanso lauką.
+        </p>
+
+        <!-- Aktyvavimo mygtukas pirštui -->
+        <div id="contentAction" class="mt-8 transition-all duration-700 opacity-0 scale-95 pointer-events-none">
+            <button onclick="openDrawer()" class="pointer-events-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-slate-950 font-bold uppercase tracking-wider text-xs shadow-[0_0_25px_rgba(16,185,129,0.4)]">
+                Peržiūrėti Tinklo Genomą →
+            </button>
+        </div>
+    </main>
+
+    <!-- APATINĖ VALDYMO JUOSTA -->
+    <footer class="relative z-10 w-full max-w-4xl flex justify-between items-center gap-3">
+        <button onclick="toggleSecondNode()" id="simBtn" class="flex-1 glass-button py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 text-xs tracking-wider uppercase font-mono text-cyan-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <span id="simBtnText">Simuliuoti Kaimyną</span>
+        </button>
+
+        <button onclick="toggleAudio()" id="audioBtn" class="glass-button py-3.5 px-5 rounded-2xl text-slate-400 font-mono text-xs uppercase tracking-wider">
+            Garsas: <span id="audioStatus" class="text-slate-500">Išjungtas</span>
+        </button>
+    </footer>
+
+    <!-- STALČIUS (DRAWER) — Genomo fragmentai, CID ir Nostr nustatymai -->
+    <div id="settingsDrawer" class="absolute inset-x-0 bottom-0 z-30 glass-panel p-6 rounded-t-3xl border-t border-slate-700/60 drawer drawer-closed max-h-[85vh] overflow-y-auto">
+        <div class="w-full flex justify-between items-center mb-5 pb-3 border-b border-slate-800">
+            <h2 class="text-sm font-bold font-sync uppercase text-amber-400 tracking-wider">Tinklo Genomas & CID Variklis</h2>
+            <button onclick="toggleDrawer()" class="p-2 text-slate-400 hover:text-white text-lg">✕</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
+            <!-- Kairė: Fragmento redagavimas -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Poetinis Atminties Fragmentas</label>
+                    <textarea id="fragmentText" rows="2" class="glass-input w-full p-3 rounded-xl text-xs">elektroninis tiltas pulsuoja per tamsų upelį</textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Kadras (Index)</label>
+                        <input type="number" id="frameIndex" value="4" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Dažniai (Hz)</label>
+                        <input type="text" id="audioFreqs" value="432, 528" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Nostr Relė WebSocket</label>
+                    <input type="text" id="relayUrl" value="wss://relay.damus.io" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button onclick="connectNostr()" class="flex-1 py-3 rounded-xl bg-slate-800 text-xs font-mono uppercase tracking-wider text-slate-200 border border-slate-700">Jungtis prie Relės</button>
+                    <button onclick="broadcastFragment()" class="flex-1 py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs font-mono uppercase tracking-wider">Transliuoti</button>
+                </div>
+            </div>
+
+            <!-- Dešinė: CID rezultatai ir srautas -->
+            <div class="space-y-4 flex flex-col justify-between">
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Deterministinis CID</label>
+                    <div id="cidOutput" class="cid-box p-3 rounded-xl">skaičiuojama...</div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1 font-mono uppercase">Tinklo Įvykių Srautas</label>
+                    <div id="eventStream" class="glass-input p-2.5 rounded-xl text-[11px] font-mono h-28 overflow-y-auto space-y-1 text-slate-400">
+                        <div>// Laukia mazgų aktyvacijos...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SKRIPTAS -->
+    <script>
+        // --- 1. DETERMINISTINIS CID SKAIČIAVIMAS (SHA-256 + Base58) ---
+        function canonicalize(obj) {
+            if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+            if (Array.isArray(obj)) return '[' + obj.map(canonicalize).join(',') + ']';
+            const sortedKeys = Object.keys(obj).sort();
+            return '{' + sortedKeys.map(k => JSON.stringify(k) + ':' + canonicalize(obj[k])).join(',') + '}';
+        }
+
+        const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        function encodeBase58(buffer) {
+            let bytes = new Uint8Array(buffer), digits = [0];
+            for (let i = 0; i < bytes.length; i++) {
+                for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
+                digits[0] += bytes[i];
+                let carry = 0;
+                for (let j = 0; j < digits.length; j++) {
+                    digits[j] += carry;
+                    carry = (digits[j] / 58) | 0;
+                    digits[j] %= 58;
+                }
+                while (carry) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+            }
+            for (let i = 0; i < bytes.length && bytes[i] === 0; i++) digits.push(0);
+            return digits.reverse().map(d => B58[d]).join('');
+        }
+
+        async function computeCID(payload) {
+            const canonicalStr = canonicalize(payload);
+            const data = new TextEncoder().encode(canonicalStr);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            
+            const multihash = new Uint8Array(34);
+            multihash[0] = 0x12; multihash[1] = 0x20;
+            multihash.set(new Uint8Array(hashBuffer), 2);
+
+            return 'z' + encodeBase58(multihash);
+        }
+
+        async function updatePayloadCID() {
+            const freqs = document.getElementById('audioFreqs').value.split(',').map(n => parseInt(n.trim())).filter(n => !isNaN(n));
+            const payload = {
+                AUDIO_FREQUENCIES: freqs,
+                FRAME_INDEX: parseInt(document.getElementById('frameIndex').value) || 0,
+                FRAGMENT_TEXT: document.getElementById('fragmentText').value.trim(),
+                PROTOCOL_VERSION: "gyvas-v1"
+            };
+            const cid = await computeCID(payload);
+            document.getElementById('cidOutput').innerText = cid;
+            return { payload, cid };
+        }
+
+        document.querySelectorAll('input, textarea').forEach(el => el.addEventListener('input', updatePayloadCID));
+
+        // --- 2. CANVAS GRAFIKA IR ANIMACIJA ---
+        const canvas = document.getElementById('nodeCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, time = 0;
+        let isConnected = false;
+
+        let node1 = { x: 0, y: 0, targetX: 0, targetY: 0 };
+        let node2 = { x: 0, y: 0, targetX: 0, targetY: 0 };
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            node1.targetX = width / 2;
+            node1.targetY = height / 2;
+            if (!isConnected) {
+                node2.x = node2.targetX = width + 200;
+                node2.y = node2.targetY = height / 2;
+            } else {
+                updateNodePositions();
+            }
+        }
+        window.addEventListener('resize', resize);
+
+        function updateNodePositions() {
+            if (window.innerWidth < 768) {
+                node1.targetX = width / 2; node1.targetY = height * 0.38;
+                node2.targetX = width / 2; node2.targetY = height * 0.62;
+            } else {
+                node1.targetX = width * 0.35; node1.targetY = height / 2;
+                node2.targetX = width * 0.65; node2.targetY = height / 2;
+            }
+        }
+
+        function lerp(a, b, t) { return (1 - t) * a + t * b; }
+
+        function drawNode(x, y, isDormant) {
+            const grad = ctx.createRadialGradient(x, y, 0, x, y, 80);
+            grad.addColorStop(0, isDormant ? 'rgba(245, 158, 11, 0.7)' : 'rgba(16, 185, 129, 0.8)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(x, y, 80, 0, Math.PI * 2); ctx.fill();
+
+            ctx.strokeStyle = isDormant ? 'rgba(245, 158, 11, 0.4)' : 'rgba(6, 182, 212, 0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(x, y, 25 + Math.sin(time * 2) * 6, 0, Math.PI * 2); ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function render() {
+            time += 0.03;
+            ctx.fillStyle = 'rgba(9, 10, 15, 0.3)';
+            ctx.fillRect(0, 0, width, height);
+
+            node1.x = lerp(node1.x, node1.targetX, 0.06);
+            node1.y = lerp(node1.y, node1.targetY, 0.06);
+            node2.x = lerp(node2.x, node2.targetX, 0.06);
+            node2.y = lerp(node2.y, node2.targetY, 0.06);
+
+            if (isConnected) {
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(node1.x, node1.y); ctx.lineTo(node2.x, node2.y); ctx.stroke();
+            }
+
+            drawNode(node1.x, node1.y, !isConnected);
+            if (isConnected || node2.x < width + 100) {
+                drawNode(node2.x, node2.y, false);
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // --- 3. UI IR BŪSENOS VALDYMAS ---
+        function toggleSecondNode() {
+            isConnected = !isConnected;
+            const mainTitle = document.getElementById('mainTitle');
+            const mainDesc = document.getElementById('mainDesc');
+            const badgeText = document.getElementById('badgeText');
+            const statusDot = document.getElementById('statusDot');
+            const simBtnText = document.getElementById('simBtnText');
+            const contentAction = document.getElementById('contentAction');
+
+            if (isConnected) {
+                updateNodePositions();
+                mainTitle.innerText = "GYVAS: 2 MAZGAI";
+                mainTitle.className = "text-4xl sm:text-6xl font-bold font-sync uppercase tracking-tighter text-emerald-300 leading-tight scale-105";
+                mainDesc.innerText = "Resonansas užfiksuotas. Atminties fragmentai sinchronizuojasi per tinklą.";
+                badgeText.innerText = "Meso Tinklas Susietas";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+                simBtnText.innerText = "Atjungti Kaimyną";
+                contentAction.classList.remove('opacity-0', 'scale-95', 'pointer-events-none');
+                contentAction.classList.add('opacity-100', 'scale-100', 'pointer-events-auto');
+            } else {
+                node2.targetX = width + 200; node2.targetY = height / 2;
+                node1.targetX = width / 2; node1.targetY = height / 2;
+                mainTitle.innerText = "TINKLAS MIEGA";
+                mainTitle.className = "text-4xl sm:text-6xl font-bold font-sync uppercase tracking-tighter text-slate-100 leading-tight";
+                mainDesc.innerText = "Vienas mazgas kuria tik aidą. Prisijunk arba simuliuok antrą tašką.";
+                badgeText.innerText = "Laukia Kaimyninio Mazgo";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping";
+                simBtnText.innerText = "Simuliuoti Kaimyną";
+                contentAction.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+            }
+        }
+
+        function toggleDrawer() {
+            const drawer = document.getElementById('settingsDrawer');
+            drawer.classList.toggle('drawer-closed');
+            drawer.classList.toggle('drawer-open');
+        }
+
+        function openDrawer() {
+            const drawer = document.getElementById('settingsDrawer');
+            drawer.classList.remove('drawer-closed');
+            drawer.classList.add('drawer-open');
+        }
+
+        // --- 4. NOSTR & WEBSOCKET SIMULIATORIUS ---
+        let ws = null;
+        async function connectNostr() {
+            const relayUrl = document.getElementById('relayUrl').value;
+            if (ws) ws.close();
+            ws = new WebSocket(relayUrl);
+            ws.onopen = () => {
+                appendStream("Prisijungta prie relės: " + relayUrl);
+                ws.send(JSON.stringify(["REQ", "gyvas-sub", {kinds: [31337], limit: 5}]));
+            };
+            ws.onmessage = async (e) => {
+                const data = JSON.parse(e.data);
+                if (data[0] === "EVENT" && data[2]) {
+                    const content = JSON.parse(data[2].content);
+                    appendStream(`[Gauta]: "${content.payload.FRAGMENT_TEXT}"`);
+                }
+            };
+            ws.onerror = () => appendStream("Ryšio klaida su relė.");
+        }
+
+        async function broadcastFragment() {
+            const { payload, cid } = await updatePayloadCID();
+            const evt = { pubkey: "node", created_at: Math.floor(Date.now()/1000), kind: 31337, content: JSON.stringify({payload, cid}) };
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(["EVENT", evt]));
+                appendStream(`[Transliuota į Nostr]: CID ${cid.slice(0,10)}...`);
+            } else {
+                appendStream(`[Lokalus CID]: ${cid.slice(0,12)}... (Relė neaktyvi)`);
+            }
+        }
+
+        function appendStream(text) {
+            const stream = document.getElementById('eventStream');
+            const div = document.createElement('div');
+            div.innerText = text;
+            stream.prepend(div);
+        }
+
+        // --- 5. AUDIO SYNTHESIZER ---
+        let audioCtx = null, osc1 = null;
+        function toggleAudio() {
+            const status = document.getElementById('audioStatus');
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const gain = audioCtx.createGain();
+                gain.gain.value = 0.05;
+                gain.connect(audioCtx.destination);
+                osc1 = audioCtx.createOscillator();
+                osc1.type = 'sine'; osc1.frequency.value = 108;
+                osc1.connect(gain); osc1.start();
+                status.innerText = "Įjungtas";
+                status.className = "text-emerald-400";
+            } else {
+                audioCtx.suspend();
+                audioCtx = null;
+                status.innerText = "Išjungtas";
+                status.className = "text-slate-500";
+            }
+        }
+
+        window.onload = () => {
+            resize();
+            render();
+            updatePayloadCID();
+            document.getElementById('nodeIdDisplay').innerText = "#0x" + Math.floor(Math.random()*0xffff).toString(16);
+        };
+    </script>
+</body>
+</html>
